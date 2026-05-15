@@ -11,7 +11,6 @@ initDB().catch(err => console.error('Database initialization failed:', err));
 // Enable CORS for frontend requests
 app.use('/*', cors({
   origin: 'http://localhost:3000',
-  allowMethods: ['POST', 'GET', 'OPTIONS'],
 }))
 
 app.get('/', (c) => {
