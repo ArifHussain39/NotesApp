@@ -2,16 +2,22 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { apiFetch } from '@/lib/api';
 
 interface Note {
   id: number;
   title: string;
   content: string;
-  createdAt: string;
+  created_at: string;
+}
+
+interface User {
+  id: number;
+  email: string;
 }
 
 export default function DashboardPage() {
-  const [user, setUser] = useState<{ name: string; email: string } | null>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [notes, setNotes] = useState<Note[]>([]);
   const [isCreating, setIsCreating] = useState(false);
   const [newNote, setNewNote] = useState({ title: '', content: '' });
@@ -20,21 +26,23 @@ export default function DashboardPage() {
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
-    if (!storedUser) {
+    const token = localStorage.getItem('token');
+    if (!storedUser || !token) {
       router.push('/login');
     } else {
-      const parsedUser = JSON.parse(storedUser);
-      setUser(parsedUser);
-      fetchNotes(parsedUser.email);
+      setUser(JSON.parse(storedUser));
+      fetchNotes();
     }
   }, [router]);
 
-  const fetchNotes = async (email: string) => {
+  const fetchNotes = async () => {
     try {
-      const response = await fetch(`http://localhost:8787/notes?email=${email}`);
-      const data = await response.json();
-      if (data.success) {
-        setNotes(data.notes);
+      const response = await apiFetch('/notes');
+      if (response.ok) {
+        const data = await response.json();
+        setNotes(data);
+      } else if (response.status === 401) {
+        handleLogout();
       }
     } catch (error) {
       console.error('Failed to fetch notes:', error);
@@ -45,24 +53,17 @@ export default function DashboardPage() {
 
   const handleCreateNote = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
 
     try {
-      const response = await fetch('http://localhost:8787/notes', {
+      const response = await apiFetch('/notes', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: user.email,
-          title: newNote.title,
-          content: newNote.content,
-        }),
+        body: JSON.stringify({ title: newNote.title, content: newNote.content }),
       });
 
-      const data = await response.json();
-      if (data.success) {
+      if (response.ok) {
         setNewNote({ title: '', content: '' });
         setIsCreating(false);
-        fetchNotes(user.email);
+        fetchNotes();
       }
     } catch (error) {
       console.error('Failed to create note:', error);
@@ -70,16 +71,12 @@ export default function DashboardPage() {
   };
 
   const handleDeleteNote = async (id: number) => {
-    if (!user) return;
     if (!confirm('Are you sure you want to delete this note?')) return;
 
     try {
-      const response = await fetch(`http://localhost:8787/notes/${id}`, {
-        method: 'DELETE',
-      });
-      const data = await response.json();
-      if (data.success) {
-        fetchNotes(user.email);
+      const response = await apiFetch(`/notes/${id}`, { method: 'DELETE' });
+      if (response.ok) {
+        fetchNotes();
       }
     } catch (error) {
       console.error('Failed to delete note:', error);
@@ -87,9 +84,12 @@ export default function DashboardPage() {
   };
 
   const handleLogout = () => {
+    localStorage.removeItem('token');
     localStorage.removeItem('user');
     router.push('/login');
   };
+
+  const displayName = user?.email.split('@')[0] ?? '';
 
   if (!user) return null;
 
@@ -105,7 +105,7 @@ export default function DashboardPage() {
               <span className="text-xl font-bold text-zinc-900 dark:text-zinc-50">NotesApp</span>
             </div>
             <div className="flex items-center gap-4">
-               <span className="hidden sm:inline text-sm text-zinc-500 dark:text-zinc-400">{user.email}</span>
+              <span className="hidden sm:inline text-sm text-zinc-500 dark:text-zinc-400">{user.email}</span>
               <button
                 onClick={handleLogout}
                 className="text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:text-red-600 transition-colors"
@@ -124,13 +124,13 @@ export default function DashboardPage() {
           <div className="relative z-10 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
             <div>
               <h1 className="text-4xl sm:text-5xl font-extrabold text-white tracking-tight">
-                Hey, <span className="text-indigo-200">{user.name}</span>
+                Hey, <span className="text-indigo-200">{displayName}</span>
               </h1>
               <p className="mt-2 text-lg text-indigo-100 max-w-md">
                 You have {notes.length} notes saved. What's on your mind today?
               </p>
             </div>
-            <button 
+            <button
               onClick={() => setIsCreating(true)}
               className="rounded-2xl bg-white px-8 py-4 text-sm font-bold text-indigo-600 shadow-xl hover:bg-zinc-50 transition-all hover:scale-105 active:scale-95"
             >
@@ -145,7 +145,7 @@ export default function DashboardPage() {
             <form onSubmit={handleCreateNote} className="bg-white dark:bg-zinc-900 rounded-3xl p-8 shadow-xl border border-indigo-100 dark:border-zinc-800">
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-2xl font-bold text-zinc-900 dark:text-zinc-50">New Note</h2>
-                <button 
+                <button
                   type="button"
                   onClick={() => setIsCreating(false)}
                   className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
@@ -160,7 +160,7 @@ export default function DashboardPage() {
                   required
                   className="w-full text-xl font-semibold bg-transparent border-none focus:ring-0 placeholder:text-zinc-300 dark:placeholder:text-zinc-700 text-zinc-900 dark:text-zinc-50"
                   value={newNote.title}
-                  onChange={(e) => setNewNote({...newNote, title: e.target.value})}
+                  onChange={(e) => setNewNote({ ...newNote, title: e.target.value })}
                 />
                 <textarea
                   placeholder="Start writing..."
@@ -168,7 +168,7 @@ export default function DashboardPage() {
                   rows={4}
                   className="w-full bg-transparent border-none focus:ring-0 placeholder:text-zinc-300 dark:placeholder:text-zinc-700 text-zinc-900 dark:text-zinc-50 resize-none"
                   value={newNote.content}
-                  onChange={(e) => setNewNote({...newNote, content: e.target.value})}
+                  onChange={(e) => setNewNote({ ...newNote, content: e.target.value })}
                 />
               </div>
               <div className="mt-6 flex justify-end gap-3">
@@ -201,7 +201,7 @@ export default function DashboardPage() {
               <div key={note.id} className="group relative rounded-3xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-6 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all">
                 <div className="flex justify-between items-start mb-4">
                   <div className="h-2 w-12 bg-indigo-600 rounded-full"></div>
-                  <button 
+                  <button
                     onClick={() => handleDeleteNote(note.id)}
                     className="opacity-0 group-hover:opacity-100 p-2 text-zinc-400 hover:text-red-500 transition-all"
                   >
@@ -214,7 +214,7 @@ export default function DashboardPage() {
                 </p>
                 <div className="mt-6 pt-6 border-t border-zinc-50 dark:border-zinc-800/50 flex items-center justify-between">
                   <span className="text-xs font-medium text-zinc-400">
-                    {new Date(note.createdAt).toLocaleDateString()}
+                    {new Date(note.created_at).toLocaleDateString()}
                   </span>
                   <button className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline">
                     Read More
@@ -226,7 +226,7 @@ export default function DashboardPage() {
         ) : (
           <div className="text-center py-20 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-3xl">
             <div className="w-16 h-16 bg-zinc-100 dark:bg-zinc-900 rounded-full flex items-center justify-center mx-auto mb-4">
-               <span className="text-3xl">📝</span>
+              <span className="text-3xl">📝</span>
             </div>
             <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-50">No notes yet</h3>
             <p className="text-zinc-500 dark:text-zinc-400 mt-1">Click the button above to create your first note!</p>

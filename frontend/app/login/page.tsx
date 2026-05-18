@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { apiFetch } from '@/lib/api';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -17,22 +18,21 @@ export default function LoginPage() {
     setError('');
 
     try {
-      const response = await fetch('http://localhost:8787/login', {
+      const response = await apiFetch('/auth/login', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
       });
 
       const data = await response.json();
 
-      if (data.success) {
-        // Store user info in localStorage for demo purposes
+      if (response.ok) {
+        localStorage.setItem('token', data.token);
         localStorage.setItem('user', JSON.stringify(data.user));
         router.push('/dashboard');
       } else {
-        setError(data.message || 'Login failed');
+        setError(data.error || 'Login failed');
       }
-    } catch (err) {
+    } catch {
       setError('Connection error. Is the backend running?');
     } finally {
       setIsLoading(false);
@@ -57,7 +57,7 @@ export default function LoginPage() {
               {error}
             </div>
           )}
-          
+
           <div className="space-y-4">
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
@@ -96,18 +96,13 @@ export default function LoginPage() {
           >
             {isLoading ? 'Signing in...' : 'Sign in'}
           </button>
-          
-          <div className="space-y-4">
-            <p className="text-center text-sm text-zinc-600 dark:text-zinc-400">
-              Don't have an account?{' '}
-              <Link href="/signup" className="font-semibold text-indigo-600 hover:text-indigo-500">
-                Sign up
-              </Link>
-            </p>
-            <p className="text-center text-xs text-zinc-500 dark:text-zinc-500 pt-4 border-t border-zinc-100 dark:border-zinc-800">
-              Demo: <span className="font-mono text-zinc-700 dark:text-zinc-300">user@example.com</span> / <span className="font-mono text-zinc-700 dark:text-zinc-300">password123</span>
-            </p>
-          </div>
+
+          <p className="text-center text-sm text-zinc-600 dark:text-zinc-400">
+            Don't have an account?{' '}
+            <Link href="/signup" className="font-semibold text-indigo-600 hover:text-indigo-500">
+              Sign up
+            </Link>
+          </p>
         </form>
       </div>
     </div>

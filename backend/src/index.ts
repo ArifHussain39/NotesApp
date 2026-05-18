@@ -15,4 +15,7 @@ initDB()
   .then(() => console.log('DB ready'))
   .catch((err) => { console.error('DB init failed:', err); process.exit(1) })
 
-export default app
+export default {
+  port: 3001,
+  fetch: app.fetch,
+}

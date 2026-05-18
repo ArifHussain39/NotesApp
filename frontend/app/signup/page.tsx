@@ -3,9 +3,9 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { apiFetch } from '@/lib/api';
 
 export default function SignupPage() {
-  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -18,22 +18,21 @@ export default function SignupPage() {
     setError('');
 
     try {
-      const response = await fetch('http://localhost:8787/signup', {
+      const response = await apiFetch('/auth/register', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, password }),
+        body: JSON.stringify({ email, password }),
       });
 
       const data = await response.json();
 
-      if (data.success) {
-        // Auto-login after signup
+      if (response.ok) {
+        localStorage.setItem('token', data.token);
         localStorage.setItem('user', JSON.stringify(data.user));
         router.push('/dashboard');
       } else {
-        setError(data.message || 'Signup failed');
+        setError(data.error || 'Signup failed');
       }
-    } catch (err) {
+    } catch {
       setError('Connection error. Is the backend running?');
     } finally {
       setIsLoading(false);
@@ -58,22 +57,8 @@ export default function SignupPage() {
               {error}
             </div>
           )}
-          
+
           <div className="space-y-4">
-            <div>
-              <label htmlFor="name" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                Full Name
-              </label>
-              <input
-                id="name"
-                type="text"
-                required
-                className="mt-1 block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-4 py-3 text-zinc-900 dark:text-zinc-50 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all"
-                placeholder="John Doe"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-              />
-            </div>
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
                 Email address
@@ -111,7 +96,7 @@ export default function SignupPage() {
           >
             {isLoading ? 'Creating account...' : 'Sign up'}
           </button>
-          
+
           <p className="text-center text-sm text-zinc-600 dark:text-zinc-400">
             Already have an account?{' '}
             <Link href="/login" className="font-semibold text-indigo-600 hover:text-indigo-500">
