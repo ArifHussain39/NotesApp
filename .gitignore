@@ -1,6 +1,12 @@
 # Dependencies
 **/node_modules
-**/package-lock.json
+**/.pnp
+**/.pnp.*
+**/.yarn/*
+!**/.yarn/patches
+!**/.yarn/plugins
+!**/.yarn/releases
+!**/.yarn/versions
 
 # Next.js
 frontend/.next/
@@ -9,8 +15,9 @@ frontend/out/
 # Build outputs
 **/dist
 **/build
+**/coverage
 
-# SQLite Database
+# SQLite
 *.db
 *.db-journal
 *.db-shm
@@ -18,6 +25,7 @@ frontend/out/
 
 # Environment variables
 **/.env
+**/.env*
 **/.env.local
 **/.env.*.local
 
@@ -25,10 +33,18 @@ frontend/out/
 .vscode/
 .idea/
 .DS_Store
+*.pem
+
+# Logs
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+.pnpm-debug.log*
+
+# TypeScript
+*.tsbuildinfo
+frontend/next-env.d.ts
 
 # Misc
 .vercel
