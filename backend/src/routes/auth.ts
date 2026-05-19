@@ -1,16 +1,17 @@
 import { Hono } from 'hono'
-import { sign } from 'hono/jwt'
+import { sign, verify } from 'hono/jwt'
 import { createMiddleware } from 'hono/factory'
 import { pool } from '../db'
+import { authMiddleware } from '../middleware/auth'
 
 const auth = new Hono()
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const JWT_EXP_SECS = 60 * 60 * 24 * 7 // 7 days
 
-function makeToken(id: number, email: string) {
+function makeToken(id: number, email: string, version: number) {
   return sign(
-    { sub: id, email, exp: Math.floor(Date.now() / 1000) + JWT_EXP_SECS },
+    { sub: id, email, version, exp: Math.floor(Date.now() / 1000) + JWT_EXP_SECS },
     process.env.JWT_SECRET!,
     'HS256'
   )
@@ -48,11 +49,11 @@ auth.post('/register', async (c) => {
   const hashed = await Bun.password.hash(password)
   try {
     const result = await pool.query(
-      'INSERT INTO users (email, password) VALUES ($1, $2) RETURNING id, email',
+      'INSERT INTO users (email, password) VALUES ($1, $2) RETURNING id, email, token_version',
       [email.toLowerCase().trim(), hashed]
     )
     const user = result.rows[0]
-    const token = await makeToken(user.id, user.email)
+    const token = await makeToken(user.id, user.email, user.token_version)
     return c.json({ token, user: { id: user.id, email: user.email } }, 201)
   } catch (e: any) {
     if (e.code === '23505') return c.json({ error: 'Email already exists' }, 409)
@@ -74,11 +75,20 @@ auth.post('/login', async (c) => {
     const valid = await Bun.password.verify(password, user.password)
     if (!valid) return c.json({ error: 'Invalid credentials' }, 401)
 
-    const token = await makeToken(user.id, user.email)
+    const token = await makeToken(user.id, user.email, user.token_version)
     return c.json({ token, user: { id: user.id, email: user.email } })
   } catch {
     return c.json({ error: 'Server error' }, 500)
   }
+})
+
+auth.post('/logout', authMiddleware as any, async (c) => {
+  const userId = (c as any).get('userId')
+  await pool.query(
+    'UPDATE users SET token_version = token_version + 1 WHERE id = $1',
+    [userId]
+  )
+  return c.json({ success: true })
 })
 
 auth.get('/me', async (c) => {
@@ -86,7 +96,6 @@ auth.get('/me', async (c) => {
   if (!authHeader?.startsWith('Bearer ')) return c.json({ error: 'Unauthorized' }, 401)
 
   try {
-    const { verify } = await import('hono/jwt')
     const payload = await verify(authHeader.slice(7), process.env.JWT_SECRET!, 'HS256')
     const result = await pool.query('SELECT id, email, created_at FROM users WHERE id = $1', [payload.sub])
     if (!result.rows[0]) return c.json({ error: 'User not found' }, 404)

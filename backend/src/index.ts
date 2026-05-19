@@ -5,6 +5,7 @@ import { bodyLimit } from 'hono/body-limit'
 import { initDB, pool } from './db'
 import authRoutes from './routes/auth'
 import notesRoutes from './routes/notes'
+import categoriesRoutes from './routes/categories'
 
 const app = new Hono()
 
@@ -22,6 +23,7 @@ app.get('/health', async (c) => {
 })
 
 app.route('/auth', authRoutes)
+app.route('/categories', categoriesRoutes)
 app.route('/notes', notesRoutes)
 
 pool.on('error', (err) => console.error('Unexpected DB pool error:', err))
