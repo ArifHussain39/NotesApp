@@ -33,7 +33,12 @@ frontend/out/
 .vscode/
 .idea/
 .DS_Store
+Thumbs.db
+desktop.ini
 *.pem
+*.key
+*.p12
+*.pfx
 
 # Logs
 *.log
@@ -45,6 +50,9 @@ yarn-error.log*
 # TypeScript
 *.tsbuildinfo
 frontend/next-env.d.ts
+
+# Cache
+**/.cache
 
 # Misc
 .vercel

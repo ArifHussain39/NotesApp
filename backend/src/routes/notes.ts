@@ -18,9 +18,14 @@ notes.get('/', async (c) => {
 notes.post('/', async (c) => {
   const userId = c.get('userId')
   const { title, content } = await c.req.json()
+
+  if (!title?.trim()) return c.json({ error: 'Title is required' }, 400)
+  if (title.length > 255) return c.json({ error: 'Title too long (max 255 chars)' }, 400)
+  if (content && content.length > 50000) return c.json({ error: 'Content too long (max 50000 chars)' }, 400)
+
   const result = await pool.query(
     'INSERT INTO notes (user_id, title, content) VALUES ($1, $2, $3) RETURNING *',
-    [userId, title ?? '', content ?? '']
+    [userId, title.trim(), content?.trim() ?? '']
   )
   return c.json(result.rows[0], 201)
 })
@@ -29,9 +34,14 @@ notes.put('/:id', async (c) => {
   const userId = c.get('userId')
   const id = c.req.param('id')
   const { title, content } = await c.req.json()
+
+  if (!title?.trim()) return c.json({ error: 'Title is required' }, 400)
+  if (title.length > 255) return c.json({ error: 'Title too long (max 255 chars)' }, 400)
+  if (content && content.length > 50000) return c.json({ error: 'Content too long (max 50000 chars)' }, 400)
+
   const result = await pool.query(
     'UPDATE notes SET title=$1, content=$2, updated_at=NOW() WHERE id=$3 AND user_id=$4 RETURNING *',
-    [title, content, id, userId]
+    [title.trim(), content?.trim() ?? '', id, userId]
   )
   if (result.rowCount === 0) return c.json({ error: 'Not found' }, 404)
   return c.json(result.rows[0])
