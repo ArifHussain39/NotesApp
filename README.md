@@ -1,69 +1,72 @@
-# 📝 NotesApp
+# NotesApp
 
-A modern, full-stack note-taking application built with Next.js and Hono.
+Full-stack note-taking app with JWT auth, built with Next.js and Hono.
 
-## 🚀 Features
-
--   **Authentication**: Secure Signup and Login flow.
--   **Dashboard**: A premium user interface to manage your personal notes.
--   **Notes CRUD**: Create, View, and Delete notes in real-time.
--   **Persistent Storage**: Powered by SQLite for reliable data management.
--   **Modern Design**: Built with Tailwind CSS 4 and React 19, supporting both light and dark modes.
-
-## 🛠️ Tech Stack
+## Tech Stack
 
 ### Frontend
--   **Framework**: [Next.js 16 (App Router)](https://nextjs.org/)
--   **Library**: [React 19](https://react.dev/)
--   **Styling**: [Tailwind CSS 4](https://tailwindcss.com/)
--   **Language**: TypeScript
+- **Framework**: Next.js 16 (App Router)
+- **Library**: React 19
+- **Styling**: Tailwind CSS 4
+- **Language**: TypeScript
 
 ### Backend
--   **Framework**: [Hono](https://hono.dev/)
--   **Runtime**: Node.js
--   **Database**: [SQLite](https://sqlite.org/) via `@libsql/client`
--   **Language**: TypeScript
+- **Framework**: Hono
+- **Runtime**: Bun
+- **Database**: PostgreSQL
+- **Language**: TypeScript
 
 ---
 
-## 🏃 Getting Started
+## Getting Started
 
-### 1. Prerequisites
-Ensure you have **Node.js** installed on your machine.
+### Prerequisites
+- [Bun](https://bun.sh) installed
+- PostgreSQL running locally
 
-### 2. Backend Setup
+### 1. Database
+
+```sql
+CREATE DATABASE notesapp;
+```
+
+### 2. Backend
+
 ```bash
 cd backend
-npm install
-npm run dev
 ```
-The backend will run on `http://localhost:8787` and initialize a `local.db` file.
 
-### 3. Frontend Setup
+Create `backend/.env`:
+```
+DATABASE_URL=postgresql://<user>:<password>@localhost:5432/notesapp
+JWT_SECRET=your-secret-key
+```
+
+```bash
+bun run dev    # http://localhost:3001
+```
+
+Tables are created automatically on first run.
+
+### 3. Frontend
+
 ```bash
 cd frontend
 npm install
-npm run dev
+npm run dev    # http://localhost:3000
 ```
-The frontend will run on `http://localhost:3000`.
 
 ---
 
-## 🔑 Test Credentials
-You can use the following account to test the application immediately:
--   **Email**: `user@example.com`
--   **Password**: `password123`
+## API
 
-Or simply create a new account using the **Sign up** feature!
+All `/notes` routes require `Authorization: Bearer <token>`.
 
-## 📂 Project Structure
-```text
-├── backend/            # Hono API & SQLite Database
-│   ├── src/db.ts       # Database initialization & Seeding
-│   └── src/index.ts    # API Endpoints (Auth & Notes)
-├── frontend/           # Next.js Web Application
-│   ├── app/login       # Login Page
-│   ├── app/signup      # Signup Page
-│   └── app/dashboard   # Notes Management Dashboard
-└── local.db            # SQLite database file (generated)
-```
+| Method | Route | Body | Description |
+|---|---|---|---|
+| POST | `/auth/register` | `{email, password}` | Create account, returns JWT |
+| POST | `/auth/login` | `{email, password}` | Login, returns JWT |
+| GET | `/notes` | — | List notes |
+| POST | `/notes` | `{title, content}` | Create note |
+| PUT | `/notes/:id` | `{title, content}` | Update note |
+| DELETE | `/notes/:id` | — | Delete note |
