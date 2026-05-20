@@ -14,6 +14,7 @@ Full-stack note-taking app with JWT auth, categories, and a 2-panel UI. Built wi
 - **Framework**: Hono
 - **Runtime**: Bun
 - **Database**: PostgreSQL
+- **ORM**: Drizzle
 - **Language**: TypeScript
 
 ---
@@ -47,7 +48,13 @@ PORT=3001
 bun run dev    # http://localhost:3001
 ```
 
-Tables and migrations run automatically on startup.
+Tables run automatically on startup via `initDB()`.
+
+To generate and run Drizzle migrations instead:
+```bash
+bunx drizzle-kit generate
+bunx drizzle-kit migrate
+```
 
 ### 3. Frontend
 
