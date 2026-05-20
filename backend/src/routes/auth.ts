@@ -1,7 +1,9 @@
 import { Hono } from 'hono'
 import { sign, verify } from 'hono/jwt'
 import { createMiddleware } from 'hono/factory'
-import { pool } from '../db'
+import { eq, sql } from 'drizzle-orm'
+import { db } from '../db'
+import { users } from '../schema'
 import { authMiddleware } from '../middleware/auth'
 
 const auth = new Hono()
@@ -48,11 +50,10 @@ auth.post('/register', async (c) => {
 
   const hashed = await Bun.password.hash(password)
   try {
-    const result = await pool.query(
-      'INSERT INTO users (email, password) VALUES ($1, $2) RETURNING id, email, token_version',
-      [email.toLowerCase().trim(), hashed]
-    )
-    const user = result.rows[0]
+    const [user] = await db.insert(users).values({
+      email: email.toLowerCase().trim(),
+      password: hashed,
+    }).returning({ id: users.id, email: users.email, token_version: users.token_version })
     const token = await makeToken(user.id, user.email, user.token_version)
     return c.json({ token, user: { id: user.id, email: user.email } }, 201)
   } catch (e: any) {
@@ -68,8 +69,7 @@ auth.post('/login', async (c) => {
   if (!EMAIL_RE.test(email)) return c.json({ error: 'Invalid email format' }, 400)
 
   try {
-    const result = await pool.query('SELECT * FROM users WHERE email = $1', [email.toLowerCase().trim()])
-    const user = result.rows[0]
+    const [user] = await db.select().from(users).where(eq(users.email, email.toLowerCase().trim()))
     if (!user) return c.json({ error: 'Invalid credentials' }, 401)
 
     const valid = await Bun.password.verify(password, user.password)
@@ -84,10 +84,9 @@ auth.post('/login', async (c) => {
 
 auth.post('/logout', authMiddleware as any, async (c) => {
   const userId = (c as any).get('userId')
-  await pool.query(
-    'UPDATE users SET token_version = token_version + 1 WHERE id = $1',
-    [userId]
-  )
+  await db.update(users)
+    .set({ token_version: sql`${users.token_version} + 1` })
+    .where(eq(users.id, userId))
   return c.json({ success: true })
 })
 
@@ -97,9 +96,11 @@ auth.get('/me', async (c) => {
 
   try {
     const payload = await verify(authHeader.slice(7), process.env.JWT_SECRET!, 'HS256')
-    const result = await pool.query('SELECT id, email, created_at FROM users WHERE id = $1', [payload.sub])
-    if (!result.rows[0]) return c.json({ error: 'User not found' }, 404)
-    return c.json({ user: result.rows[0] })
+    const [user] = await db.select({ id: users.id, email: users.email, created_at: users.created_at })
+      .from(users)
+      .where(eq(users.id, Number(payload.sub)))
+    if (!user) return c.json({ error: 'User not found' }, 404)
+    return c.json({ user })
   } catch {
     return c.json({ error: 'Invalid token' }, 401)
   }

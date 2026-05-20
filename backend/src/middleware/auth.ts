@@ -1,6 +1,8 @@
 import { createMiddleware } from 'hono/factory'
 import { verify } from 'hono/jwt'
-import { pool } from '../db'
+import { eq } from 'drizzle-orm'
+import { db } from '../db'
+import { users } from '../schema'
 import type { AppEnv } from '../types'
 
 export const authMiddleware = createMiddleware<AppEnv>(async (c, next) => {
@@ -13,8 +15,9 @@ export const authMiddleware = createMiddleware<AppEnv>(async (c, next) => {
     const payload = await verify(token, process.env.JWT_SECRET!, 'HS256')
 
     // Check token version — invalidates all tokens issued before last logout
-    const result = await pool.query('SELECT token_version FROM users WHERE id = $1', [payload.sub])
-    const user = result.rows[0]
+    const [user] = await db.select({ token_version: users.token_version })
+      .from(users)
+      .where(eq(users.id, payload.sub as number))
     if (!user || (payload.version as number) !== user.token_version) {
       return c.json({ error: 'Token revoked' }, 401)
     }

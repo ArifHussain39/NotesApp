@@ -1,5 +1,7 @@
 import { Hono } from 'hono'
-import { pool } from '../db'
+import { eq, and, desc } from 'drizzle-orm'
+import { db } from '../db'
+import { notes as notesTable } from '../schema'
 import { authMiddleware } from '../middleware/auth'
 import type { AppEnv } from '../types'
 
@@ -8,11 +10,10 @@ notes.use('*', authMiddleware)
 
 notes.get('/', async (c) => {
   const userId = c.get('userId')
-  const result = await pool.query(
-    'SELECT * FROM notes WHERE user_id = $1 ORDER BY updated_at DESC',
-    [userId]
-  )
-  return c.json(result.rows)
+  const result = await db.select().from(notesTable)
+    .where(eq(notesTable.user_id, userId))
+    .orderBy(desc(notesTable.updated_at))
+  return c.json(result)
 })
 
 notes.post('/', async (c) => {
@@ -23,39 +24,39 @@ notes.post('/', async (c) => {
   if (title.length > 255) return c.json({ error: 'Title too long (max 255 chars)' }, 400)
   if (content && content.length > 50000) return c.json({ error: 'Content too long (max 50000 chars)' }, 400)
 
-  const result = await pool.query(
-    'INSERT INTO notes (user_id, category_id, title, content) VALUES ($1, $2, $3, $4) RETURNING *',
-    [userId, category_id ?? null, title.trim(), content?.trim() ?? '']
-  )
-  return c.json(result.rows[0], 201)
+  const [note] = await db.insert(notesTable).values({
+    user_id: userId,
+    category_id: category_id ?? null,
+    title: title.trim(),
+    content: content?.trim() ?? '',
+  }).returning()
+  return c.json(note, 201)
 })
 
 notes.put('/:id', async (c) => {
   const userId = c.get('userId')
-  const id = c.req.param('id')
+  const id = parseInt(c.req.param('id'))
   const { title, content, category_id } = await c.req.json()
 
   if (!title?.trim()) return c.json({ error: 'Title is required' }, 400)
   if (title.length > 255) return c.json({ error: 'Title too long (max 255 chars)' }, 400)
   if (content && content.length > 50000) return c.json({ error: 'Content too long (max 50000 chars)' }, 400)
 
-  const result = await pool.query(
-    `UPDATE notes SET title=$1, content=$2, category_id=$3, updated_at=NOW()
-     WHERE id=$4 AND user_id=$5 RETURNING *`,
-    [title.trim(), content?.trim() ?? '', category_id ?? null, id, userId]
-  )
-  if (result.rowCount === 0) return c.json({ error: 'Not found' }, 404)
-  return c.json(result.rows[0])
+  const [note] = await db.update(notesTable)
+    .set({ title: title.trim(), content: content?.trim() ?? '', category_id: category_id ?? null, updated_at: new Date() })
+    .where(and(eq(notesTable.id, id), eq(notesTable.user_id, userId)))
+    .returning()
+  if (!note) return c.json({ error: 'Not found' }, 404)
+  return c.json(note)
 })
 
 notes.delete('/:id', async (c) => {
   const userId = c.get('userId')
-  const id = c.req.param('id')
-  const result = await pool.query(
-    'DELETE FROM notes WHERE id=$1 AND user_id=$2',
-    [id, userId]
-  )
-  if (result.rowCount === 0) return c.json({ error: 'Not found' }, 404)
+  const id = parseInt(c.req.param('id'))
+  const [deleted] = await db.delete(notesTable)
+    .where(and(eq(notesTable.id, id), eq(notesTable.user_id, userId)))
+    .returning()
+  if (!deleted) return c.json({ error: 'Not found' }, 404)
   return c.json({ success: true })
 })
 
